@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Turno - FCO2 | RED TAG - FAULTY EKS</title>
+    <title>RED TAG - FAULTY EKS | FCO2</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -16,7 +16,7 @@
             flex-direction: column;
         }
         .header { text-align: center; padding: 30px 20px 10px; }
-        .header h1 { font-size: 2em; color: #fff; margin-bottom: 5px; }
+        .header h1 { font-size: 2.2em; color: #fff; margin-bottom: 5px; }
         .header .subtitle { color: #a8b2d1; font-size: 1em; }
         #clock { font-size: 1.2em; color: #4ecca3; margin-top: 8px; }
         #lastUpdate { font-size: 0.85em; color: #666; margin-top: 5px; }
@@ -41,7 +41,6 @@
             background: rgba(233,69,96,0.12); border: 2px solid #e94560;
             border-radius: 12px; padding: 20px 30px; font-size: 3.5em;
             font-weight: bold; color: #fff; min-width: 110px;
-            transition: all 0.3s ease;
         }
         .status { text-align: center; padding: 20px; color: #a8b2d1; font-size: 1em; }
         .status.error { color: #e94560; }
@@ -65,17 +64,14 @@
 </div>
 
 <div class="dashboard" id="dashboard">
-    <div class="status loading">⏳ Caricamento dati da SharePoint...</div>
+    <div class="status loading">⏳ Caricamento dati...</div>
 </div>
 
-<div class="footer">I dati si aggiornano automaticamente ogni 30 secondi dal file Excel su SharePoint</div>
+<div class="footer">I dati si aggiornano automaticamente ogni 30 secondi da Google Sheets</div>
 
 <script>
-    // ============================================================
-    // CONFIGURAZIONE
-    // ============================================================
-    const SHAREPOINT_CONFIG = {
-        fileUrl: "https://amazon-my.sharepoint.com/personal/nsqueo_amazon_it/_layouts/15/download.aspx?share=BHecsgpahBtCnxOaKWGRCogBZz0ypVLLQKJLqXJfJGJXYQ",
+    const CONFIG = {
+        csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRDHdThnZM2oeclHydf2h2KQhl2vbs0qwD6BBSnUzsxFbDFE-PDEj3s0sosuAWU6Tr03lk3k-xel4wy/pub?gid=0&single=true&output=csv",
         refreshInterval: 30000
     };
 
@@ -83,45 +79,45 @@
 
     async function loadData() {
         try {
-            const response = await fetch(SHAREPOINT_CONFIG.fileUrl, {
-                credentials: 'include'
-            });
+            const response = await fetch(CONFIG.csvUrl);
             if (!response.ok) throw new Error('HTTP ' + response.status);
-
-            const arrayBuffer = await response.arrayBuffer();
-            const data = parseExcel(arrayBuffer);
+            const csvText = await response.text();
+            const data = parseCSV(csvText);
             renderDashboard(data);
             updateLastRefresh();
         } catch (error) {
             console.error('Errore:', error);
-            dashboard.innerHTML = '<div class="status error">⚠️ Errore caricamento. Verifica che il file sia condiviso con "Chiunque abbia il link".</div>';
+            dashboard.innerHTML = '<div class="status error">⚠️ Errore nel caricamento dati. Riprovo tra 30 secondi...</div>';
         }
     }
 
-    function parseExcel(arrayBuffer) {
-        if (typeof XLSX !== 'undefined') {
-            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-            return jsonData;
+    function parseCSV(csv) {
+        const lines = csv.trim().split('
+');
+        if (lines.length < 2) return [];
+        const data = [];
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+            if (values.length >= 2 && values[0]) {
+                data.push({
+                    titolo: values[0],
+                    numeri: values.slice(1).join(',')
+                });
+            }
         }
-        return null;
+        return data;
     }
 
     function renderDashboard(data) {
         if (!data || data.length === 0) {
-            dashboard.innerHTML = '<div class="status error">⚠️ Nessun dato trovato nel file</div>';
+            dashboard.innerHTML = '<div class="status error">⚠️ Nessun dato trovato nel foglio</div>';
             return;
         }
         dashboard.innerHTML = '';
-
         data.forEach(row => {
-            const keys = Object.keys(row);
-            const title = row[keys[0]] || 'EKS';
-            const numbersRaw = String(row[keys[1]] || '');
-            const numbers = numbersRaw.split(',').map(n => n.trim()).filter(n => n !== '');
+            const title = row.titolo;
+            const numbers = row.numeri.split(',').map(n => n.trim()).filter(n => n !== '' && n !== '0');
             if (numbers.length === 0) return;
-
             const card = document.createElement('div');
             card.className = 'card';
             const numbersHTML = numbers.map(n => '<div class="number-box">' + n + '</div>').join('');
@@ -143,14 +139,8 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // Carica libreria SheetJS per leggere Excel
-    const script = document.createElement('script');
-    script.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
-    script.onload = function() {
-        loadData();
-        setInterval(loadData, SHAREPOINT_CONFIG.refreshInterval);
-    };
-    document.head.appendChild(script);
+    loadData();
+    setInterval(loadData, CONFIG.refreshInterval);
 </script>
 
 </body>
