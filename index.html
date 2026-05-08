@@ -1,0 +1,158 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Turno - FCO2 | RED TAG - FAULTY EKS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header { text-align: center; padding: 30px 20px 10px; }
+        .header h1 { font-size: 2em; color: #fff; margin-bottom: 5px; }
+        .header .subtitle { color: #a8b2d1; font-size: 1em; }
+        #clock { font-size: 1.2em; color: #4ecca3; margin-top: 8px; }
+        #lastUpdate { font-size: 0.85em; color: #666; margin-top: 5px; }
+        .dashboard {
+            flex: 1; display: flex; flex-wrap: wrap;
+            justify-content: center; align-items: center;
+            padding: 40px 20px; gap: 25px;
+        }
+        .card {
+            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            border-radius: 20px; padding: 40px 50px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            border: 1px solid rgba(233,69,96,0.3);
+            text-align: center; max-width: 900px; width: 100%;
+        }
+        .card h2 {
+            font-size: 1.5em; text-transform: uppercase;
+            letter-spacing: 3px; margin-bottom: 30px; color: #e94560;
+        }
+        .numbers-container { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+        .number-box {
+            background: rgba(233,69,96,0.12); border: 2px solid #e94560;
+            border-radius: 12px; padding: 20px 30px; font-size: 3.5em;
+            font-weight: bold; color: #fff; min-width: 110px;
+            transition: all 0.3s ease;
+        }
+        .status { text-align: center; padding: 20px; color: #a8b2d1; font-size: 1em; }
+        .status.error { color: #e94560; }
+        .status.loading { color: #4ecca3; }
+        .footer { text-align: center; padding: 15px; color: #444; font-size: 0.75em; }
+        .live-dot {
+            display: inline-block; width: 10px; height: 10px;
+            background: #4ecca3; border-radius: 50%; margin-right: 6px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🚫 RED TAG - FAULTY EKS</h1>
+    <div class="subtitle">FCO2 - Pick Department</div>
+    <div id="clock"></div>
+    <div id="lastUpdate"><span class="live-dot"></span>In attesa del primo caricamento...</div>
+</div>
+
+<div class="dashboard" id="dashboard">
+    <div class="status loading">⏳ Caricamento dati da SharePoint...</div>
+</div>
+
+<div class="footer">I dati si aggiornano automaticamente ogni 30 secondi dal file Excel su SharePoint</div>
+
+<script>
+    // ============================================================
+    // CONFIGURAZIONE
+    // ============================================================
+    const SHAREPOINT_CONFIG = {
+        fileUrl: "https://amazon-my.sharepoint.com/personal/nsqueo_amazon_it/_layouts/15/download.aspx?share=BHecsgpahBtCnxOaKWGRCogBZz0ypVLLQKJLqXJfJGJXYQ",
+        refreshInterval: 30000
+    };
+
+    const dashboard = document.getElementById('dashboard');
+
+    async function loadData() {
+        try {
+            const response = await fetch(SHAREPOINT_CONFIG.fileUrl, {
+                credentials: 'include'
+            });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+
+            const arrayBuffer = await response.arrayBuffer();
+            const data = parseExcel(arrayBuffer);
+            renderDashboard(data);
+            updateLastRefresh();
+        } catch (error) {
+            console.error('Errore:', error);
+            dashboard.innerHTML = '<div class="status error">⚠️ Errore caricamento. Verifica che il file sia condiviso con "Chiunque abbia il link".</div>';
+        }
+    }
+
+    function parseExcel(arrayBuffer) {
+        if (typeof XLSX !== 'undefined') {
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+            return jsonData;
+        }
+        return null;
+    }
+
+    function renderDashboard(data) {
+        if (!data || data.length === 0) {
+            dashboard.innerHTML = '<div class="status error">⚠️ Nessun dato trovato nel file</div>';
+            return;
+        }
+        dashboard.innerHTML = '';
+
+        data.forEach(row => {
+            const keys = Object.keys(row);
+            const title = row[keys[0]] || 'EKS';
+            const numbersRaw = String(row[keys[1]] || '');
+            const numbers = numbersRaw.split(',').map(n => n.trim()).filter(n => n !== '');
+            if (numbers.length === 0) return;
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            const numbersHTML = numbers.map(n => '<div class="number-box">' + n + '</div>').join('');
+            card.innerHTML = '<h2>' + title + '</h2><div class="numbers-container">' + numbersHTML + '</div>';
+            dashboard.appendChild(card);
+        });
+    }
+
+    function updateLastRefresh() {
+        const now = new Date();
+        document.getElementById('lastUpdate').innerHTML = '<span class="live-dot"></span>Ultimo aggiornamento: ' + now.toLocaleTimeString('it-IT');
+    }
+
+    function updateClock() {
+        const now = new Date();
+        const options = { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+        document.getElementById('clock').textContent = now.toLocaleDateString('it-IT', options);
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Carica libreria SheetJS per leggere Excel
+    const script = document.createElement('script');
+    script.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+    script.onload = function() {
+        loadData();
+        setInterval(loadData, SHAREPOINT_CONFIG.refreshInterval);
+    };
+    document.head.appendChild(script);
+</script>
+
+</body>
+</html>
+
