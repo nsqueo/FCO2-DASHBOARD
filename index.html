@@ -94,19 +94,37 @@
     function parseCSV(csv) {
         const lines = csv.trim().split('
 ');
-        if (lines.length < 2) return [];
         const data = [];
-        for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-            if (values.length >= 2 && values[0]) {
-                data.push({
-                    titolo: values[0],
-                    numeri: values.slice(1).join(',')
-                });
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            let titolo, numeri;
+
+            if (line.includes('"')) {
+                const match = line.match(/^([^,]+),"(.+)"$/);
+                if (match) {
+                    titolo = match.trim();
+                    numeri = match.trim();
+                } else {
+                    const parts = line.replace(/"/g, '').split(',');
+                    titolo = parts.trim();
+                    numeri = parts.slice(1).join(',').trim();
+                }
+            } else {
+                const parts = line.split(',');
+                titolo = parts.trim();
+                numeri = parts.slice(1).join(',').trim();
+            }
+
+            if (titolo && numeri) {
+                data.push({ titolo, numeri });
             }
         }
         return data;
     }
+
 
     function renderDashboard(data) {
         if (!data || data.length === 0) {
