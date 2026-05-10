@@ -70,89 +70,95 @@
 <div class="footer">I dati si aggiornano automaticamente ogni 30 secondi da Google Sheets</div>
 
 <script>
-    const CONFIG = {
+    var CONFIG = {
         csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRDHdThnZM2oeclHydf2h2KQhl2vbs0qwD6BBSnUzsxFbDFE-PDEj3s0sosuAWU6Tr03lk3k-xel4wy/pub?gid=0&single=true&output=csv",
         refreshInterval: 30000
     };
 
-    const dashboard = document.getElementById('dashboard');
+    var dashboard = document.getElementById("dashboard");
 
-    async function loadData() {
-        try {
-            const response = await fetch(CONFIG.csvUrl);
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            const csvText = await response.text();
-            const data = parseCSV(csvText);
-            renderDashboard(data);
-            updateLastRefresh();
-        } catch (error) {
-            console.error('Errore:', error);
-            dashboard.innerHTML = '<div class="status error">⚠️ Errore nel caricamento dati. Riprovo tra 30 secondi...</div>';
-        }
+    function loadData() {
+        fetch(CONFIG.csvUrl)
+            .then(function(response) {
+                if (!response.ok) throw new Error("HTTP " + response.status);
+                return response.text();
+            })
+            .then(function(csvText) {
+                var data = parseCSV(csvText);
+                renderDashboard(data);
+                updateLastRefresh();
+            })
+            .catch(function(error) {
+                console.error("Errore:", error);
+                dashboard.innerHTML = '<div class="status error">⚠️ Errore nel caricamento dati. Riprovo tra 30 secondi...</div>';
+            });
     }
 
     function parseCSV(csv) {
-        const lines = csv.trim().split('
-');
-        const data = [];
+        var lines = csv.trim().split("
+");
+        var data = [];
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
             if (!line) continue;
 
-            let titolo, numeri;
+            var titolo = "";
+            var numeri = "";
 
-            if (line.includes('"')) {
-                const match = line.match(/^([^,]+),"(.+)"$/);
+            if (line.indexOf('"') !== -1) {
+                var match = line.match(/^([^,]+),"(.+)"$/);
                 if (match) {
-                    titolo = match.trim();
-                    numeri = match.trim();
+                    titolo = match[1].trim();
+                    numeri = match[2].trim();
                 } else {
-                    const parts = line.replace(/"/g, '').split(',');
-                    titolo = parts.trim();
-                    numeri = parts.slice(1).join(',').trim();
+                    var parts = line.replace(/"/g, "").split(",");
+                    titolo = parts[0].trim();
+                    numeri = parts.slice(1).join(",").trim();
                 }
             } else {
-                const parts = line.split(',');
-                titolo = parts.trim();
-                numeri = parts.slice(1).join(',').trim();
+                var parts2 = line.split(",");
+                titolo = parts2[0].trim();
+                numeri = parts2.slice(1).join(",").trim();
             }
 
             if (titolo && numeri) {
-                data.push({ titolo, numeri });
+                data.push({ titolo: titolo, numeri: numeri });
             }
         }
         return data;
     }
-
 
     function renderDashboard(data) {
         if (!data || data.length === 0) {
             dashboard.innerHTML = '<div class="status error">⚠️ Nessun dato trovato nel foglio</div>';
             return;
         }
-        dashboard.innerHTML = '';
-        data.forEach(row => {
-            const title = row.titolo;
-            const numbers = row.numeri.split(',').map(n => n.trim()).filter(n => n !== '' && n !== '0');
-            if (numbers.length === 0) return;
-            const card = document.createElement('div');
-            card.className = 'card';
-            const numbersHTML = numbers.map(n => '<div class="number-box">' + n + '</div>').join('');
-            card.innerHTML = '<h2>' + title + '</h2><div class="numbers-container">' + numbersHTML + '</div>';
+        dashboard.innerHTML = "";
+        for (var j = 0; j < data.length; j++) {
+            var row = data[j];
+            var numbers = row.numeri.split(",").map(function(n) { return n.trim(); }).filter(function(n) { return n !== ""; });
+            if (numbers.length === 0) continue;
+            var card = document.createElement("div");
+            card.className = "card";
+            var numbersHTML = "";
+            for (var k = 0; k < numbers.length; k++) {
+                numbersHTML += '<div class="number-box">' + numbers[k] + '</div>';
+            }
+            card.innerHTML = '<h2>' + row.titolo + '</h2><div class="numbers-container">' + numbersHTML + '</div>';
             dashboard.appendChild(card);
-        });
+        }
     }
 
     function updateLastRefresh() {
-        const now = new Date();
-        document.getElementById('lastUpdate').innerHTML = '<span class="live-dot"></span>Ultimo aggiornamento: ' + now.toLocaleTimeString('it-IT');
+        var now = new Date();
+        document.getElementById("lastUpdate").innerHTML = '<span class="live-dot"></span>Ultimo aggiornamento: ' + now.toLocaleTimeString("it-IT");
     }
 
     function updateClock() {
-        const now = new Date();
-        const options = { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', second: '2-digit' };
-        document.getElementById('clock').textContent = now.toLocaleDateString('it-IT', options);
+        var now = new Date();
+        var options = { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", second: "2-digit" };
+        document.getElementById("clock").textContent = now.toLocaleDateString("it-IT", options);
     }
     setInterval(updateClock, 1000);
     updateClock();
